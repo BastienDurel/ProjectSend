@@ -68,6 +68,31 @@ switch ($groups_form_type) {
 				<a href="#" class="btn remove-all"><?php _e('Remove all','cftp_admin'); ?></a>
 			</div>
 		</li>
+		<li class="assigns">
+			<label for="add_group_form_members_users"><?php _e('Users','cftp_admin'); ?></label>
+			<select multiple="multiple" id="members-users-select" class="form-control chosen-select" name="add_group_form_members_users[]" data-placeholder="<?php _e('Select one or more options. Type to search.', 'cftp_admin');?>">
+				<?php
+					$sql = $database->query("SELECT * FROM tbl_users WHERE level != '0' ORDER BY name ASC");
+					while($row = mysql_fetch_array($sql)) {
+				?>
+						<option value="<?php echo $row["id"]; ?>"
+							<?php
+								if($groups_form_type == 'edit_group') {
+									if (in_array($row["id"],$current_members)) {
+										echo ' selected="selected"';
+									}
+								}
+							?>
+						><?php echo $row["name"]; ?></option>
+				<?php
+					}
+				?>
+			</select>
+			<div class="list_mass_members">
+				<a href="#" class="btn add-all"><?php _e('Add all','cftp_admin'); ?></a>
+				<a href="#" class="btn remove-all"><?php _e('Remove all','cftp_admin'); ?></a>
+			</div>
+		</li>
 	</ul>
 
 	<div class="inside_form_buttons">

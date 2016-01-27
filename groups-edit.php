@@ -70,6 +70,12 @@ if ($_POST) {
 	$add_group_data_name = mysql_real_escape_string($_POST['add_group_form_name']);
 	$add_group_data_description = mysql_real_escape_string($_POST['add_group_form_description']);
 	$add_group_data_members = (!empty($_POST['add_group_form_members']) ? $_POST['add_group_form_members'] : '');
+    if (!empty($_POST['add_group_form_members_users'])) {
+        if ($add_group_data_members == '')
+            $add_group_data_members = $_POST['add_group_form_members_users'];
+        else
+            $add_group_data_members = array_merge($add_group_data_members, $_POST['add_group_form_members_users']);
+    }
 
 	/** Arguments used on validation and group creation. */
 	$edit_arguments = array(
