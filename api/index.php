@@ -14,6 +14,7 @@ getApi()->get('users', array('Users', 'get_list'), EpiApi::external);
 getApi()->get('user/list', array('Users', 'get_list'), EpiApi::external);
 getApi()->get('user/(\d+)', array('Users', 'get'), EpiApi::external);
 getApi()->put('user', array('Users', 'create'), EpiApi::external);
+getApi()->delete('user/(\d+)', array('Users', 'del'), EpiApi::external);
 // TODO
 
 getRoute()->run();
@@ -137,5 +138,21 @@ class Users {
             global $valid_me;
             return $valid_me->error_msg;
         }
+    }
+
+    function del($id) {
+
+        if ($id == 0) {
+            header('HTTP/1.1 400 Bad Request');
+            return 'You cannot delete your own account.';
+        }
+
+        // force auth... TODO: provides auth
+        $_SESSION['userlevel'] = 9;
+        
+        $this_user = new UserActions();
+        $delete_user = $this_user->delete_user($id);
+
+        return $delete_user;
     }
 }
