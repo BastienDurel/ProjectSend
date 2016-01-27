@@ -1,27 +1,27 @@
 <?php
+require 'vendor/autoload.php';
+use \Psr\Http\Message\ServerRequestInterface as Request;
+use \Psr\Http\Message\ResponseInterface as Response;
 
-include_once 'epiphany/Epi.php';
 include_once '../sys.includes.php';
 
-Epi::setPath('base', 'epiphany');
-Epi::init('api');
+$app = new \Slim\App;
 
 // user viewable page
-getRoute()->get('/', 'showEndpoints');
+$app->get('/', 'showEndpoints');
 
 // api
-getApi()->get('users', array('Users', 'get_list'), EpiApi::external);
-getApi()->get('user/list', array('Users', 'get_list'), EpiApi::external);
-getApi()->get('user/(\d+)', array('Users', 'get'), EpiApi::external);
-getApi()->put('user', array('Users', 'create'), EpiApi::external);
-getApi()->delete('user/(\d+)', array('Users', 'del'), EpiApi::external);
-// TODO
+$app->get('/users', 'Users::get_list');
+$app->get('/user/list', 'Users::get_list');
+$app->get('/user/{id}', 'Users::get');
+$app->put('/user', 'Users::create');
+$app->delete('/user/{id}', 'Users::del');
 
-getRoute()->run();
+$app->run();
 
-function showEndpoints()
+function showEndpoints(Request $request, Response $response)
 {
-      echo '<ul>
+    $response->getBody()->write('<ul>
           <li><a href="/api">/</a> -> (home)</li>
           <li>GET /users -> Get user list</li>
           <li>PUT /user -> Create user</li>
@@ -29,24 +29,11 @@ function showEndpoints()
           <li>GET /user/(id) -> Get user by id</li>
           <li>DELETE /user/(id) -> Delete user by id</li>
           <!-- TODO -->
-        </ul>';
-}
-
-function get_data() {
-    switch ($_SERVER['CONTENT_TYPE']) {
-    case 'application/x-www-form-urlencoded':
-        parse_str(file_get_contents("php://input"), $vars);
-        break;
-    default:
-        header('HTTP/1.1 500 Internal Server Error');
-        echo 'Unknown content-type';
-        exit();
-    }
-    return $vars;
+        </ul>');
 }
 
 class Users {
-    function get_list() {
+    function get_list(Request $request, Response $response) {
 
         global $database;
 
@@ -68,13 +55,16 @@ class Users {
         }
 
         $database->Close();
-        
-        return $ret;
+
+        $response->getBody()->write(json_encode($ret));
+        return $response->withHeader('Content-type', 'application/json');
     }
 
-    function get($id) {
+    function get(Request $request, Response $response, $args) {
 
         global $database;
+
+        $id = (int)$args['id'];
 
         $database->MySQLDB();
         $cq = "SELECT * FROM tbl_users WHERE id = " . ((int)$id);
@@ -93,15 +83,17 @@ class Users {
             $u["contact"] = $row["contact"];
             $u["created_by"] = $row["created_by"];
             $u["active"] = $row["active"];
-            return $u;
+
+            $response->getBody()->write(json_encode($u));
+            return $response->withHeader('Content-type', 'application/json');
         }
         else
             return array();
         
     }
 
-    function create() {
-        $vars = get_data();
+    function create(Request $request, Response $response) {
+        $vars = $request->getParsedBody();
         error_log(print_r($vars, true));
 
         global $database;
@@ -133,16 +125,20 @@ class Users {
         /** Create the user if validation is correct. */
         if ($new_validate == 1) {
             $new_response = $new_user->create_user($new_arguments);
-            return $new_response;
+
+            $response->getBody()->write(json_encode($new_response));
+            return $response->withHeader('Content-type', 'application/json');
         }
         else {
-            header('HTTP/1.1 400 Bad Request');
             global $valid_me;
-            return $valid_me->error_msg;
+            $response->getBody()->write($valid_me->error_msg);
+            return $response->withStatus(400);
         }
     }
 
-    function del($id) {
+    function del(Request $request, Response $response, $args) {
+
+        $id = (int)$args['id'];
 
         if ($id == 0) {
             header('HTTP/1.1 400 Bad Request');
@@ -155,6 +151,7 @@ class Users {
         $this_user = new UserActions();
         $delete_user = $this_user->delete_user($id);
 
-        return $delete_user;
+        $response->getBody()->write(json_encode($delete_user));
+        return $response->withHeader('Content-type', 'application/json');
     }
 }
