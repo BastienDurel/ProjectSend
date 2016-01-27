@@ -26,9 +26,14 @@ if (!empty($_GET['file_id'])) {
 	$this_file_id = mysql_real_escape_string($_GET['file_id']);
 }
 
+$current_user_in_group = current_user_in_group();
+
 /** Fill the users array that will be used on the notifications process */
 $users = array();
-$cq = "SELECT id, name, level FROM tbl_users ORDER BY name ASC";
+$cq = "SELECT id, name, level FROM tbl_users";
+if ($current_user_in_group)
+    $cq .= " WHERE id in (SELECT m2.client_id FROM tbl_members m, tbl_users u, tbl_members m2 WHERE u.user='".get_current_user_username()."' AND m.client_id = u.id  AND m2.group_id = m.group_id)";
+$cq .= " ORDER BY name ASC";
 $sql = $database->query($cq);
 while($row = mysql_fetch_array($sql)) {
 	$users[$row["id"]] = $row["name"];
@@ -38,7 +43,10 @@ while($row = mysql_fetch_array($sql)) {
 }
 /** Fill the groups array that will be used on the form */
 $groups = array();
-$cq = "SELECT id, name FROM tbl_groups ORDER BY name ASC";
+$cq = "SELECT id, name FROM tbl_groups";
+if ($current_user_in_group)
+    $cq .= " WHERE id IN (SELECT m.group_id FROM tbl_members m, tbl_users u WHERE m.client_id = u.id AND u.user='".get_current_user_username()."')";
+$cq .= " ORDER BY name ASC";
 $sql = $database->query($cq);
 	while($row = mysql_fetch_array($sql)) {
 	$groups[$row["id"]] = $row["name"];

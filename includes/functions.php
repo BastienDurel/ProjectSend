@@ -945,4 +945,18 @@ function render_log_action($params)
 	
 	return $log;
 }
+
+/**
+ * Returns true if the current logged-in user is in a group
+ */
+function current_user_in_group() {
+    global $database;
+    $database->MySQLDB();
+    $u = get_current_user_username();
+    $sql = $database->query("SELECT 1 FROM tbl_members m, tbl_users u WHERE m.client_id = u.id AND u.user='$u'");
+    if ($row = mysql_fetch_array($sql))
+        return true;
+    return false;
+}
+
 ?>
