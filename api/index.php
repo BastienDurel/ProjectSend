@@ -23,9 +23,11 @@ function showEndpoints()
 {
       echo '<ul>
           <li><a href="/api">/</a> -> (home)</li>
-          <li>/users -> Get user list</li>
-          <li>/user/list -> Get user list</li>
-          <li>/user/(id) -> Get user by id</li>
+          <li>GET /users -> Get user list</li>
+          <li>PUT /user -> Create user</li>
+          <li>GET /user/list -> Get user list</li>
+          <li>GET /user/(id) -> Get user by id</li>
+          <li>DELETE /user/(id) -> Delete user by id</li>
           <!-- TODO -->
         </ul>';
 }
