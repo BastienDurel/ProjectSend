@@ -21,7 +21,7 @@ $app->run();
 
 function showEndpoints(Request $request, Response $response)
 {
-    $response->getBody()->write('<ul>
+    $response->write('<ul>
           <li><a href="/api">/</a> -> (home)</li>
           <li>GET /users -> Get user list</li>
           <li>PUT /user -> Create user</li>
@@ -56,8 +56,7 @@ class Users {
 
         $database->Close();
 
-        $response->getBody()->write(json_encode($ret));
-        return $response->withHeader('Content-type', 'application/json');
+        return $response->withHeader('Content-type', 'application/json')->write(json_encode($ret));
     }
 
     function get(Request $request, Response $response, $args) {
@@ -84,8 +83,7 @@ class Users {
             $u["created_by"] = $row["created_by"];
             $u["active"] = $row["active"];
 
-            $response->getBody()->write(json_encode($u));
-            return $response->withHeader('Content-type', 'application/json');
+            return $response->withHeader('Content-type', 'application/json')->write(json_encode($u));
         }
         else
             return array();
@@ -94,7 +92,6 @@ class Users {
 
     function create(Request $request, Response $response) {
         $vars = $request->getParsedBody();
-        error_log(print_r($vars, true));
 
         global $database;
         $database->MySQLDB();
@@ -126,13 +123,11 @@ class Users {
         if ($new_validate == 1) {
             $new_response = $new_user->create_user($new_arguments);
 
-            $response->getBody()->write(json_encode($new_response));
-            return $response->withHeader('Content-type', 'application/json');
+            return $response->withHeader('Content-type', 'application/json')->write(json_encode($new_response));
         }
         else {
             global $valid_me;
-            $response->getBody()->write($valid_me->error_msg);
-            return $response->withStatus(400);
+            return $response->withStatus(400)->write($valid_me->error_msg);
         }
     }
 
@@ -151,7 +146,6 @@ class Users {
         $this_user = new UserActions();
         $delete_user = $this_user->delete_user($id);
 
-        $response->getBody()->write(json_encode($delete_user));
-        return $response->withHeader('Content-type', 'application/json');
+        return $response->withHeader('Content-type', 'application/json')->write(json_encode($delete_user));
     }
 }
