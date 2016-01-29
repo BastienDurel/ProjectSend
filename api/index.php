@@ -7,15 +7,23 @@ include_once '../sys.includes.php';
 
 $app = new \Slim\App;
 
+// middleware: ensure there is a newline at the end of the output
+class EnsureNl
+{
+    public function __invoke($request, $response, $next) {
+        return $next($request, $response)->write("\n");
+    }
+}
+
 // user viewable page
 $app->get('/', 'showEndpoints');
 
 // api
-$app->get('/users', 'Users::get_list');
-$app->get('/user/list', 'Users::get_list');
-$app->get('/user/{id}', 'Users::get');
-$app->put('/user', 'Users::create');
-$app->delete('/user/{id}', 'Users::del');
+$app->get('/users', 'Users::get_list')->add(EnsureNl::class);
+$app->get('/user/list', 'Users::get_list')->add(EnsureNl::class);
+$app->get('/user/{id}', 'Users::get')->add(EnsureNl::class);
+$app->put('/user', 'Users::create')->add(EnsureNl::class);
+$app->delete('/user/{id}', 'Users::del')->add(EnsureNl::class);
 
 $app->run();
 
