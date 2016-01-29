@@ -21,9 +21,10 @@ $app->get('/', 'showEndpoints');
 // api
 $app->get('/users', 'Users::get_list')->add(EnsureNl::class);
 $app->get('/user/list', 'Users::get_list')->add(EnsureNl::class);
-$app->get('/user/{id}', 'Users::get')->add(EnsureNl::class);
-$app->put('/user', 'Users::create')->add(EnsureNl::class);
-$app->delete('/user/{id}', 'Users::del')->add(EnsureNl::class);
+$app->get('/user/{id:[0-9]+}', 'Users::get')->add(EnsureNl::class);
+$app->post('/user', 'Users::create')->add(EnsureNl::class);
+$app->put('/user/{id:[0-9]+}', 'Users::update');
+$app->delete('/user/{id:[0-9]+}', 'Users::del')->add(EnsureNl::class);
 
 $app->run();
 
@@ -98,6 +99,7 @@ class Users {
         
     }
 
+    // use POST for create, then we can return new user's data
     function create(Request $request, Response $response) {
         $vars = $request->getParsedBody();
 
@@ -139,6 +141,65 @@ class Users {
         }
     }
 
+    // Use PUT for update as we don't need to return anything
+    function update(Request $request, Response $response, $args) {
+        global $database;
+
+        $id = (int)$args['id'];
+        
+        if (user_exists_id($id)) {
+
+            $database->MySQLDB();
+            $editing = $database->query("SELECT * FROM tbl_users WHERE id=$id");
+
+            if ($edit_arguments = mysql_fetch_array($editing)) {
+
+                for ($i = 0; $i < 15; ++$i)
+                    if (array_key_exists($i, $edit_arguments))
+                        unset($edit_arguments[$i]);
+                    else
+                        break;
+
+                $data = $request->getParsedBody();
+                
+                if (isset($data['name'])) $edit_arguments['name'] = mysql_real_escape_string($data['name']);
+                if (isset($data['user'])) $edit_arguments['user'] = mysql_real_escape_string($data['user']);
+                if (isset($data['email'])) $edit_arguments['email'] = mysql_real_escape_string($data['email']);
+
+                if (isset($data['phone'])) $edit_arguments['phone'] = mysql_real_escape_string($data['phone']);
+
+                // special case for password:
+                $edit_arguments['password'] = isset($data['password']) ? $data['password'] : '';
+                // special case for level:
+                $edit_arguments['role'] = isset($data['level']) ? $data['level'] : $edit_arguments['level'];
+                unset($edit_arguments['level']);
+            }
+            else {
+                return $response->withStatus(500)->write("Got no user data");
+            }
+            
+            /** Create the object */
+            $edit_user = new UserActions();
+
+            /** Validate the information. */
+            $edit_validate = $edit_user->validate_user($edit_arguments);
+
+            /** Create the user if validation is correct. */
+            if ($edit_validate == 1) {
+                $edit_response = $edit_user->edit_user($edit_arguments);
+            }
+            else {
+                global $valid_me;
+                return $response->withStatus(400)->write($valid_me->error_msg);
+            }
+            
+            return $response;
+        }
+        else {
+            return $response->withStatus(400)->write('Non-existant user');
+        }
+    }
+    
     function del(Request $request, Response $response, $args) {
 
         $id = (int)$args['id'];
