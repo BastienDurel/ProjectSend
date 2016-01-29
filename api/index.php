@@ -86,7 +86,7 @@ class Users {
             return $response->withHeader('Content-type', 'application/json')->write(json_encode($u));
         }
         else
-            return array();
+            return $response->withHeader('Content-type', 'application/json')->write(json_encode(null));
         
     }
 
@@ -136,8 +136,7 @@ class Users {
         $id = (int)$args['id'];
 
         if ($id == 0) {
-            header('HTTP/1.1 400 Bad Request');
-            return 'You cannot delete your own account.';
+            return $response->withStatus(400)->write('You cannot delete your own account.');
         }
 
         // force auth... TODO: provides auth
