@@ -36,7 +36,8 @@ require_once(ROOT_DIR.'/includes/userlevel_check.php');
 require_once(ROOT_DIR.'/includes/templates.php');
 
 /** Contains the current session information */
-require_once(ROOT_DIR.'/includes/active.session.php');
+if (!isset($API_NO_SESSION))
+    require_once(ROOT_DIR.'/includes/active.session.php');
 
 /** Recreate the function if it doesn't exist. By Alan Reiblein */
 require_once(ROOT_DIR.'/includes/timezone_identifiers_list.php');

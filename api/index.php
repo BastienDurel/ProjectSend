@@ -3,7 +3,11 @@ require 'vendor/autoload.php';
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 
+// Do not use auto session
+$API_NO_SESSION = true;
 include_once '../sys.includes.php';
+if (ini_get("session.use_cookies"))
+    ini_set("session.use_cookies", 0);
 
 $app = new \Slim\App;
 
@@ -15,16 +19,66 @@ class EnsureNl
     }
 }
 
+class CheckLogin
+{
+    public function __invoke($request, $response, $next) {
+        $_session = $request->getHeader('X-Session');
+        if (!empty($_session)) {
+            if (is_array($_session)) {
+                if (count($_session))
+                    $session = array_pop($_session);
+            }
+            else
+                $session = $_session;
+        }
+        else {
+            switch ($request->getMethod()) {
+            case 'POST':
+            case 'PUT':
+                $vars = $request->getParsedBody();
+                if (array_key_exists('session', $vars)) {
+                    $session = $vars['session'];
+                    break;
+                }
+                // else do not break and take it from query
+            case 'GET':
+            case 'DELETE':
+            default:
+                $vars = $request->getQueryParams();
+                if (array_key_exists('session', $vars))
+                    $session = $vars['session'];
+                break;
+            }
+        }
+        if (isset($session)) {
+            error_log("session is: $session (".print_r($session, true).")");
+            session_id($session);
+            error_log("session_id changed");
+            session_start();
+            error_log("session started");
+            if (isset($_SESSION['userlevel']))
+                return $next($request, $response);
+            else
+                $response->write("Cannot find userlevel into session\n");
+        }
+        return $response->withStatus(403)->write("No authentication, or authentication failed\n");
+    }
+}
+
 // user viewable page
 $app->get('/', 'showEndpoints');
 
 // api
-$app->get('/users', 'Users::get_list')->add(EnsureNl::class);
-$app->get('/user/list', 'Users::get_list')->add(EnsureNl::class);
-$app->get('/user/{id:[0-9]+}', 'Users::get')->add(EnsureNl::class);
-$app->post('/user', 'Users::create')->add(EnsureNl::class);
-$app->put('/user/{id:[0-9]+}', 'Users::update');
-$app->delete('/user/{id:[0-9]+}', 'Users::del')->add(EnsureNl::class);
+$app->get('/users', 'Users::get_list')->add(EnsureNl::class)->add(CheckLogin::class);
+$app->group('/user', function () use ($app) {
+    $app->get('/list', 'Users::get_list')->add(EnsureNl::class);
+    $app->get('/{id:[0-9]+}', 'Users::get')->add(EnsureNl::class);
+    $app->post('/', 'Users::create')->add(EnsureNl::class);
+    $app->put('/{id:[0-9]+}', 'Users::update');
+    $app->delete('/{id:[0-9]+}', 'Users::del')->add(EnsureNl::class);
+})->add(CheckLogin::class);
+$app->post('/login', 'Api::login')->add(EnsureNl::class);
+$app->post('/logout', 'Api::logout')->add(EnsureNl::class)->add(CheckLogin::class);
 
 $app->run();
 
@@ -39,6 +93,67 @@ function showEndpoints(Request $request, Response $response)
           <li>DELETE /user/(id) -> Delete user by id</li>
           <!-- TODO -->
         </ul>');
+    return $response;
+}
+
+class Api {
+    function login(Request $request, Response $response)
+    {
+        global $database;
+        global $hasher;
+        $vars = $request->getParsedBody();
+
+        if (!array_key_exists('user', $vars) || !array_key_exists('password', $vars))
+            return $response->withStatus(400)->write('Missing username or password');
+
+        $database->MySQLDB();
+        $sysuser_username = mysql_real_escape_string($vars['user']);
+        $sysuser_password = mysql_real_escape_string($vars['password']);
+
+        $sql_user = $database->query("SELECT * FROM tbl_users WHERE BINARY user='$sysuser_username'");
+        $count_user = mysql_num_rows($sql_user);
+        if ($count_user < 1)
+            return $response->withStatus(403)->write('Bad username or password');
+        while ($row = mysql_fetch_array($sql_user)) {
+            $db_pass = $row['password'];
+            $user_level = $row["level"];
+            $active_status = $row['active'];
+            $logged_id = $row['id'];
+            $global_name = $row['name'];
+        }
+        $check_password = $hasher->CheckPassword($sysuser_password, $db_pass);
+        if (!$check_password)
+            return $response->withStatus(403)->write('Bad username or password');
+
+        if ($active_status == '0')
+            return $response->withStatus(403)->write('Account disabled');
+
+        if ($user_level == '0')
+            return $response->withStatus(403)->write('Access restricted to admin only');
+
+        session_start();
+        $_SESSION['loggedin'] = $sysuser_username;
+        $_SESSION['userlevel'] = $user_level;
+        $_SESSION['access'] = 'admin';
+
+
+        /** Record the action log */
+        $new_log_action = new LogActions();
+        $log_action_args = array(
+            'action' => 1,// TODO: maybe defines a "login with API" action ?
+            'owner_id' => $logged_id,
+            'affected_account_name' => $global_name
+        );
+        $new_record_action = $new_log_action->log_action_save($log_action_args);
+
+        $ret = array('session' => session_id());
+        return $response->withHeader('Content-type', 'application/json')->write(json_encode($ret));
+    }
+
+    function logout(Request $request, Response $response) {
+        session_destroy();
+        return $response;
+    }
 }
 
 class Users {
@@ -207,9 +322,6 @@ class Users {
         if ($id == 0) {
             return $response->withStatus(400)->write('You cannot delete your own account.');
         }
-
-        // force auth... TODO: provides auth
-        $_SESSION['userlevel'] = 9;
         
         $this_user = new UserActions();
         $delete_user = $this_user->delete_user($id);
