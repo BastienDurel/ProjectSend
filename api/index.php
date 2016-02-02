@@ -51,11 +51,8 @@ class CheckLogin
             }
         }
         if (isset($session)) {
-            error_log("session is: $session (".print_r($session, true).")");
             session_id($session);
-            error_log("session_id changed");
             session_start();
-            error_log("session started");
             if (isset($_SESSION['userlevel']))
                 return $next($request, $response);
             else
