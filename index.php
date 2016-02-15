@@ -76,12 +76,17 @@ include('header-unlogged.php');
 										);
 					$new_record_action = $new_log_action->log_action_save($log_action_args);
 
-					if ($user_level == '0') {
-						header("location:".BASE_URI."my_files/");
-					}
-					else {
-						header("location:home.php");
-					}
+                    if (array_key_exists('original_request', $_POST) && !empty($_POST['original_request'])) {
+                        header('location:'.base64_decode($_POST['original_request']));
+                    }
+                    else {
+                        if ($user_level == '0') {
+                            header("location:".BASE_URI."my_files/");
+                        }
+                        else {
+                            header("location:home.php");
+                        }
+                    }
 					exit;
 				}
 				else {
@@ -166,6 +171,9 @@ include('header-unlogged.php');
 									<button type="submit" name="submit" class="btn btn-wide btn-primary"><?php _e('Continue','cftp_admin'); ?></button>
 								</div>
 							</fieldset>
+<?php if (array_key_exists('original_request', $_GET)): ?>
+                            <input type="hidden" name="original_request" value="<?php echo addslashes($_GET['original_request']) ?>" />
+<?php endif ?>
 						</form>
 			
 						<div class="login_form_links">

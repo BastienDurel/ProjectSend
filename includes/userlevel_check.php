@@ -77,7 +77,13 @@ function check_for_session()
 		$is_logged_now = true;
 	}
 	if(!$is_logged_now) {
-		header("location:index.php");
+        if (array_key_exists('QUERY_STRING', $_SERVER) && !empty($_SERVER['QUERY_STRING'])) {
+            $ret = $_SERVER['REQUEST_URI'].'?'.$_SERVER['QUERY_STRING'];
+            $return = 'original_request='.base64_encode($ret);
+            header("location:index.php?$return");
+        }
+        else
+            header("location:index.php");
 	}
 	return $is_logged_now;
 }
