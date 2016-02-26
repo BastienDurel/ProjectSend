@@ -97,6 +97,13 @@ $app->group('/user', function () use ($app) {
     $app->put('/{id:[0-9]+}', 'Users::update');
     $app->delete('/{id:[0-9]+}', 'Users::del')->add(EnsureNl::class);
 })->add(CheckLogin::class);
+$app->group('/client', function () use ($app) {
+    $app->get('/list', 'Clients::get_list')->add(EnsureNl::class);
+    $app->get('/{id:[0-9]+}', 'clients::get')->add(EnsureNl::class);
+    $app->post('/', 'Clients::create')->add(EnsureNl::class);
+    $app->put('/{id:[0-9]+}', 'Clients::update');
+    $app->delete('/{id:[0-9]+}', 'Clients::del')->add(EnsureNl::class);
+})->add(CheckLogin::class);
 $app->group('/group', function () use ($app) {
     $app->get('/list', 'Groups::get_list')->add(EnsureNl::class);
     $app->get('/{id:[0-9]+}', 'Groups::get')->add(EnsureNl::class);
@@ -363,6 +370,37 @@ class Users {
         $delete_user = $this_user->delete_user($id);
 
         return $response->withHeader('Content-type', 'application/json')->write(json_encode($delete_user));
+    }
+}
+
+class Clients extends Users {
+    function get_list(Request $request, Response $response) {
+
+        if (!CheckLogin::checkLevel(array(9)))
+            return $response->withStatus(403)->write('Not enought rights');
+
+        global $database;
+
+        $database->MySQLDB();
+        $cq = "SELECT * FROM tbl_users WHERE level = '0'";
+
+        $ret = array();
+
+        $cq .= " ORDER BY name ASC";
+
+        $sql = $database->query($cq);
+        $count = mysql_num_rows($sql);
+
+        while($row = mysql_fetch_array($sql)) {
+            $u = array();
+            $u['id'] = $row['id'];
+            $u['user'] = $row['user'];
+            $ret[] = $u;
+        }
+
+        $database->Close();
+
+        return $response->withHeader('Content-type', 'application/json')->write(json_encode($ret));
     }
 }
 
