@@ -53,12 +53,29 @@ class CheckLogin
         if (isset($session)) {
             session_id($session);
             session_start();
-            if (isset($_SESSION['userlevel']))
+            if (isset($_SESSION['userlevel'])) {
+                global $global_name;
+                global $global_level;
+                global $global_user;
+                global $global_id;
+                global $global_account;
+                $global_level = $_SESSION['userlevel'];
+                $global_user = $_SESSION['loggedin'];
+                $global_account = get_user_by_username($global_user);
+                $global_name = $global_account['name'];
+                $global_id = $global_account['id'];
+                if ($global_account['active'] == '0') {
+                    session_destroy();
+                    return $response->withStatus(403)->write('Account disabled');
+                }
+                if ($global_level == '0')
+                    return $response->withStatus(403)->write('Access restricted to admin only');
                 return $next($request, $response);
+            }
             else
-                $response->write("Cannot find userlevel into session\n");
+                $response->write("Cannot find userlevel into session");
         }
-        return $response->withStatus(403)->write("No authentication, or authentication failed\n");
+        return $response->withStatus(403)->write("No authentication, or authentication failed");
     }
 
     public static function checkLevel($levels) {
@@ -110,6 +127,7 @@ class Api {
     {
         global $database;
         global $hasher;
+        global $global_name;
         $vars = $request->getParsedBody();
 
         if (!array_key_exists('user', $vars) || !array_key_exists('password', $vars))
@@ -332,10 +350,11 @@ class Users {
     }
     
     function del(Request $request, Response $response, $args) {
+        global $global_id;
 
         $id = (int)$args['id'];
 
-        if ($id == $_SESSION['logged_id']) {
+        if ($id == $global_id) {
             return $response->withStatus(400)->write('You cannot delete your own account.');
         }
         
@@ -453,6 +472,7 @@ class Groups {
     }
 
     function del(Request $request, Response $response, $args) {
+        global $global_id;
 
         $id = (int)$args['id'];
 
@@ -467,7 +487,7 @@ class Groups {
         $new_log_action = new LogActions();
         $log_action_args = array(
             'action' => 18,
-            'owner_id' => $_SESSION['logged_id'],
+            'owner_id' => $global_id,
             'affected_account_name' => $group['name']
         );
         $new_record_action = $new_log_action->log_action_save($log_action_args);
