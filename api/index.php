@@ -60,6 +60,12 @@ class CheckLogin
         }
         return $response->withStatus(403)->write("No authentication, or authentication failed\n");
     }
+
+    public static function checkLevel($levels) {
+        if (!is_array($levels))
+            $levels = array($levels);
+        return in_array($_SESSION['userlevel'], $levels);
+    }
 }
 
 // user viewable page
@@ -160,6 +166,9 @@ class Api {
 class Users {
     function get_list(Request $request, Response $response) {
 
+        if (!CheckLogin::checkLevel(array(9)))
+            return $response->withStatus(403)->write("Not enought rights\n");
+
         global $database;
 
         $database->MySQLDB();
@@ -185,6 +194,9 @@ class Users {
     }
 
     function get(Request $request, Response $response, $args) {
+
+        if (!CheckLogin::checkLevel(array(9)))
+            return $response->withStatus(403)->write("Not enought rights\n");
 
         global $database;
 
@@ -334,6 +346,9 @@ class Users {
 class Groups {
     function get_list(Request $request, Response $response) {
 
+        if (!CheckLogin::checkLevel(array(9, 8)))
+            return $response->withStatus(403)->write("Not enought rights\n");
+
         global $database;
 
         $database->MySQLDB();
@@ -359,6 +374,9 @@ class Groups {
     }
 
     function get(Request $request, Response $response, $args) {
+
+        if (!CheckLogin::checkLevel(array(9, 8)))
+            return $response->withStatus(403)->write("Not enought rights\n");
 
         global $database;
 
