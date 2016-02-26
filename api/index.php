@@ -73,9 +73,9 @@ class CheckLogin
                 return $next($request, $response);
             }
             else
-                $response->write("Cannot find userlevel into session");
+                $response->write("Cannot find userlevel into session\n");
         }
-        return $response->withStatus(403)->write("No authentication, or authentication failed");
+        return $response->withStatus(403)->write("No authentication, or authentication failed\n");
     }
 
     public static function checkLevel($levels) {
@@ -101,6 +101,7 @@ $app->group('/group', function () use ($app) {
     $app->get('/list', 'Groups::get_list')->add(EnsureNl::class);
     $app->get('/{id:[0-9]+}', 'Groups::get')->add(EnsureNl::class);
     $app->post('/', 'Groups::create')->add(EnsureNl::class);
+    $app->put('/{id:[0-9]+}', 'Groups::update');
     $app->delete('/{id:[0-9]+}', 'Groups::del')->add(EnsureNl::class);
 })->add(CheckLogin::class);
 $app->post('/login', 'Api::login')->add(EnsureNl::class);
@@ -468,6 +469,45 @@ class Groups {
         else {
             global $valid_me;
             return $response->withStatus(400)->write($valid_me->error_msg);
+        }
+    }
+
+    function update(Request $request, Response $response, $args) {
+
+        $id = (int)$args['id'];
+        $group = self::_get($id);
+
+        if ($group != null) {
+
+            $data = $request->getParsedBody();
+
+            $edit_arguments = array('id' => $id, 'name' => $group['name'], 'description' => $group['description']);
+
+            if (isset($data['name'])) $edit_arguments['name'] = mysql_real_escape_string($data['name']);
+            if (isset($data['description'])) $edit_arguments['description'] = mysql_real_escape_string($data['description']);
+
+            // special case for members:
+            $edit_arguments['members'] = isset($data['members']) ? $data['members'] : '';
+
+            /** Create the object */
+            $edit_group = new GroupActions();
+
+            /** Validate the information. */
+            $edit_validate = $edit_group->validate_group($edit_arguments);
+
+            /** Create the user if validation is correct. */
+            if ($edit_validate == 1) {
+                $edit_response = $edit_group->edit_group($edit_arguments);
+            }
+            else {
+                global $valid_me;
+                return $response->withStatus(400)->write($valid_me->error_msg);
+            }
+
+            return $response;
+        }
+        else {
+            return $response->withStatus(400)->write('Non-existant group');
         }
     }
 
