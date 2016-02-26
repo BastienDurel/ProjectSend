@@ -74,6 +74,10 @@ $app->group('/user', function () use ($app) {
     $app->put('/{id:[0-9]+}', 'Users::update');
     $app->delete('/{id:[0-9]+}', 'Users::del')->add(EnsureNl::class);
 })->add(CheckLogin::class);
+$app->group('/group', function () use ($app) {
+    $app->get('/list', 'Groups::get_list')->add(EnsureNl::class);
+    $app->get('/{id:[0-9]+}', 'Groups::get')->add(EnsureNl::class);
+})->add(CheckLogin::class);
 $app->post('/login', 'Api::login')->add(EnsureNl::class);
 $app->post('/logout', 'Api::logout')->add(EnsureNl::class)->add(CheckLogin::class);
 
@@ -324,5 +328,68 @@ class Users {
         $delete_user = $this_user->delete_user($id);
 
         return $response->withHeader('Content-type', 'application/json')->write(json_encode($delete_user));
+    }
+}
+
+class Groups {
+    function get_list(Request $request, Response $response) {
+
+        global $database;
+
+        $database->MySQLDB();
+        $cq = "SELECT id,name FROM tbl_groups";
+
+        $ret = array();
+
+        $cq .= " ORDER BY id ASC";
+
+        $sql = $database->query($cq);
+        $count = mysql_num_rows($sql);
+
+        while($row = mysql_fetch_array($sql)) {
+            $u = array();
+            $u['id'] = $row['id'];
+            $u['name'] = $row['name'];
+            $ret[] = $u;
+        }
+
+        $database->Close();
+
+        return $response->withHeader('Content-type', 'application/json')->write(json_encode($ret));
+    }
+
+    function get(Request $request, Response $response, $args) {
+
+        global $database;
+
+        $id = (int)$args['id'];
+
+        $fcount = "SELECT COUNT(file_id) files FROM tbl_files_relations WHERE group_id = " . ((int)$id);
+        $ucount = "SELECT COUNT(client_id) members_count FROM tbl_members WHERE group_id = " . ((int)$id);
+
+        $database->MySQLDB();
+        $cq = "SELECT * FROM tbl_groups g, ($fcount) f, ($ucount) u WHERE g.id = " . ((int)$id);
+        $sql = $database->query($cq);
+        if ($row = mysql_fetch_array($sql)) {
+            for ($i = 0; $i < 15; $i++)
+                if (array_key_exists($i, $row))
+                    unset($row[$i]);
+
+            $row['members'] = array();
+
+            $uq = "SELECT u.id, u.name FROM tbl_members m, tbl_users u WHERE m.client_id = u.id AND m.group_id = " . ((int)$id);
+            $sqlu = $database->query($uq);
+            while($rowu = mysql_fetch_array($sqlu)) {
+                for ($i = 0; $i < 2; $i++)
+                    if (array_key_exists($i, $rowu))
+                        unset($rowu[$i]);
+                $row['members'][] = $rowu;
+            }
+
+            return $response->withHeader('Content-type', 'application/json')->write(json_encode($row));
+        }
+        else
+            return $response->withHeader('Content-type', 'application/json')->write(json_encode(null));
+
     }
 }
