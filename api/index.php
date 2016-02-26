@@ -83,6 +83,8 @@ $app->group('/user', function () use ($app) {
 $app->group('/group', function () use ($app) {
     $app->get('/list', 'Groups::get_list')->add(EnsureNl::class);
     $app->get('/{id:[0-9]+}', 'Groups::get')->add(EnsureNl::class);
+    $app->post('/', 'Groups::create')->add(EnsureNl::class);
+    $app->delete('/{id:[0-9]+}', 'Groups::del')->add(EnsureNl::class);
 })->add(CheckLogin::class);
 $app->post('/login', 'Api::login')->add(EnsureNl::class);
 $app->post('/logout', 'Api::logout')->add(EnsureNl::class)->add(CheckLogin::class);
@@ -142,6 +144,7 @@ class Api {
         $_SESSION['loggedin'] = $sysuser_username;
         $_SESSION['userlevel'] = $user_level;
         $_SESSION['access'] = 'admin';
+        $_SESSION['logged_id'] = (int)$logged_id;
 
 
         /** Record the action log */
@@ -167,7 +170,7 @@ class Users {
     function get_list(Request $request, Response $response) {
 
         if (!CheckLogin::checkLevel(array(9)))
-            return $response->withStatus(403)->write("Not enought rights\n");
+            return $response->withStatus(403)->write('Not enought rights');
 
         global $database;
 
@@ -196,7 +199,7 @@ class Users {
     function get(Request $request, Response $response, $args) {
 
         if (!CheckLogin::checkLevel(array(9)))
-            return $response->withStatus(403)->write("Not enought rights\n");
+            return $response->withStatus(403)->write('Not enought rights');
 
         global $database;
 
@@ -332,7 +335,7 @@ class Users {
 
         $id = (int)$args['id'];
 
-        if ($id == 0) {
+        if ($id == $_SESSION['logged_id']) {
             return $response->withStatus(400)->write('You cannot delete your own account.');
         }
         
@@ -347,7 +350,7 @@ class Groups {
     function get_list(Request $request, Response $response) {
 
         if (!CheckLogin::checkLevel(array(9, 8)))
-            return $response->withStatus(403)->write("Not enought rights\n");
+            return $response->withStatus(403)->write('Not enought rights');
 
         global $database;
 
@@ -373,15 +376,9 @@ class Groups {
         return $response->withHeader('Content-type', 'application/json')->write(json_encode($ret));
     }
 
-    function get(Request $request, Response $response, $args) {
-
-        if (!CheckLogin::checkLevel(array(9, 8)))
-            return $response->withStatus(403)->write("Not enought rights\n");
-
+    function _get($id) {
         global $database;
-
-        $id = (int)$args['id'];
-
+        
         $fcount = "SELECT COUNT(file_id) files FROM tbl_files_relations WHERE group_id = " . ((int)$id);
         $ucount = "SELECT COUNT(client_id) members_count FROM tbl_members WHERE group_id = " . ((int)$id);
 
@@ -404,10 +401,77 @@ class Groups {
                 $row['members'][] = $rowu;
             }
 
-            return $response->withHeader('Content-type', 'application/json')->write(json_encode($row));
+            return $row;
         }
         else
-            return $response->withHeader('Content-type', 'application/json')->write(json_encode(null));
+            return null;
+    }
 
+    function get(Request $request, Response $response, $args) {
+
+        if (!CheckLogin::checkLevel(array(9, 8)))
+            return $response->withStatus(403)->write('Not enought rights');
+
+        $id = (int)$args['id'];
+
+        $group = self::_get($id);
+
+        return $response->withHeader('Content-type', 'application/json')->write(json_encode($group));
+    }
+
+    function create(Request $request, Response $response) {
+        $vars = $request->getParsedBody();
+
+        global $database;
+        $database->MySQLDB();
+
+        // cleanup
+        $add_group_data_name = encode_html($vars['name']);
+        $add_group_data_description = isset($vars['description']) ? encode_html($vars['description']) : '';
+
+        $new_group = new GroupActions();
+        $new_arguments = array(
+            'id' => '',
+            'name' => $add_group_data_name,
+            'description' => $add_group_data_description,
+            'role' => $vars['members']
+        );
+
+        /** Validate the information from the posted data. */
+        $new_validate = $new_group->validate_group($new_arguments);
+
+        /** Create the user if validation is correct. */
+        if ($new_validate == 1) {
+            $new_response = $new_group->create_group($new_arguments);
+
+            return $response->withHeader('Content-type', 'application/json')->write(json_encode($new_response));
+        }
+        else {
+            global $valid_me;
+            return $response->withStatus(400)->write($valid_me->error_msg);
+        }
+    }
+
+    function del(Request $request, Response $response, $args) {
+
+        $id = (int)$args['id'];
+
+        $group = self::_get($id);
+        if ($group == null)
+            return $response->withStatus(400)->write('Unknown group');
+
+        $this_group = new GroupActions();
+        $delete_group = $this_group->delete_group($id);
+
+        /** Record the action log */
+        $new_log_action = new LogActions();
+        $log_action_args = array(
+            'action' => 18,
+            'owner_id' => $_SESSION['logged_id'],
+            'affected_account_name' => $group['name']
+        );
+        $new_record_action = $new_log_action->log_action_save($log_action_args);
+
+        return $response->withHeader('Content-type', 'application/json')->write(json_encode($delete_group));
     }
 }
